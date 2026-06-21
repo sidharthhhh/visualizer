@@ -1,0 +1,83 @@
+.PHONY: help build build-docker push deploy clean test lint
+
+# Default target
+help:
+	@echo "ContainerScope Production Build"
+	@echo ""
+	@echo "Usage:"
+	@echo "  make build         Build all binaries"
+	@echo "  make build-docker  Build Docker images"
+	@echo "  make push          Push Docker images to registry"
+	@echo "  make deploy        Deploy to production"
+	@echo "  make test          Run all tests"
+	@echo "  make lint          Run all linters"
+	@echo "  make clean         Clean build artifacts"
+
+# Build binaries
+build: build-backend build-agent build-frontend
+
+build-backend:
+	cd backend && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o ../bin/containerscope-backend ./cmd/server
+
+build-agent:
+	cd agent && CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o ../bin/containerscope-agent ./cmd/agent
+
+build-frontend:
+	cd frontend && npm run build
+
+# Docker builds
+build-docker:
+	docker build -t containerscope/backend:latest ./backend
+	docker build -t containerscope/agent:latest ./agent
+	docker build -t containerscope/frontend:latest ./frontend
+
+# Push to registry
+push:
+	docker push containerscope/backend:latest
+	docker push containerscope/agent:latest
+	docker push containerscope/frontend:latest
+
+# Deploy
+deploy:
+	docker compose -f docker-compose.prod.yml up -d
+
+# Testing
+test: test-backend test-frontend
+
+test-backend:
+	cd backend && go test -v ./...
+
+test-frontend:
+	cd frontend && npm run test
+
+# Linting
+lint: lint-backend lint-frontend
+
+lint-backend:
+	cd backend && go vet ./...
+
+lint-frontend:
+	cd frontend && npm run lint
+
+# Type checking
+typecheck:
+	cd frontend && npm run typecheck
+
+# Clean
+clean:
+	rm -rf bin/
+	rm -rf backend/bin/
+	rm -rf agent/bin/
+	rm -rf frontend/dist/
+	rm -rf frontend/node_modules/
+
+# Security scan
+security:
+	cd backend && go install github.com/securego/gosec/v2/cmd/gosec@latest && gosec ./...
+
+# Generate secrets
+generate-secrets:
+	@echo "JWT_SECRET=$$(openssl rand -base64 48)"
+	@echo "POSTGRES_PASSWORD=$$(openssl rand -base64 24)"
+	@echo "CLICKHOUSE_PASSWORD=$$(openssl rand -base64 24)"
+	@echo "MINIO_ROOT_PASSWORD=$$(openssl rand -base64 24)"

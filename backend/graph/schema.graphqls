@@ -1,0 +1,270 @@
+type Query {
+  containers(orgId: ID!, connectionId: ID!): [Container!]!
+  container(orgId: ID!, connectionId: ID!, id: ID!): Container
+  networks(orgId: ID!, connectionId: ID!): [Network!]!
+  edges(orgId: ID!, connectionId: ID!): [Edge!]!
+  topology(orgId: ID!, connectionId: ID!): Topology!
+  
+  metrics(orgId: ID!, connectionId: ID!, runtimeId: String!, metric: String!, start: Time, end: Time): [MetricSample!]!
+  instantMetrics(orgId: ID!, connectionId: ID!, runtimeId: String!): InstantMetrics!
+  
+  flows(orgId: ID!, connectionId: ID!, start: Time, end: Time, limit: Int): [Flow!]!
+  
+  vulnScans(orgId: ID!, connectionId: ID!): [VulnScan!]!
+  vulnScan(orgId: ID!, connectionId: ID!, scanId: ID!): VulnScan
+  
+  alerts(orgId: ID!, connectionId: ID!, status: String): [Alert!]!
+  alertRules(orgId: ID!, connectionId: ID!): [AlertRule!]!
+  
+  misconfigs(orgId: ID!, connectionId: ID!): [Misconfig!]!
+  
+  k8sNamespaces(orgId: ID!, connectionId: ID!): [K8sNamespace!]!
+  k8sDeployments(orgId: ID!, connectionId: ID!, namespace: String): [K8sDeployment!]!
+  k8sPods(orgId: ID!, connectionId: ID!, namespace: String): [K8sPod!]!
+  k8sNodes(orgId: ID!, connectionId: ID!): [K8sNode!]!
+  k8sServices(orgId: ID!, connectionId: ID!, namespace: String): [K8sService!]!
+}
+
+type Mutation {
+  createConnection(orgId: ID!, type: String!, name: String!): Connection!
+  recordVulnScan(orgId: ID!, connectionId: ID!, input: VulnScanInput!): VulnScan!
+  createAlertRule(orgId: ID!, connectionId: ID!, input: AlertRuleInput!): AlertRule!
+  silenceAlert(orgId: ID!, connectionId: ID!, alertId: ID!): Alert!
+}
+
+type Container {
+  id: ID!
+  connectionId: ID!
+  runtimeId: String!
+  name: String!
+  image: String!
+  state: String!
+  labels: JSON
+  ports: [Port!]
+  createdAt: Time!
+  updatedAt: Time!
+}
+
+type Port {
+  hostPort: String!
+  containerPort: String!
+  protocol: String!
+}
+
+type Network {
+  id: ID!
+  connectionId: ID!
+  name: String!
+  driver: String!
+  scope: String!
+  subnet: String!
+}
+
+type Edge {
+  id: ID!
+  connectionId: ID!
+  srcContainerId: String!
+  dstContainerId: String
+  dstIp: String!
+  dstPort: Int!
+  protocol: String!
+  firstSeen: Time!
+  lastSeen: Time!
+}
+
+type Topology {
+  containers: [Container!]!
+  networks: [Network!]!
+  edges: [Edge!]!
+}
+
+type MetricSample {
+  timestamp: Time!
+  value: Float!
+}
+
+type InstantMetrics {
+  cpu: Float
+  memory: Float
+  netRx: Float
+  netTx: Float
+  diskR: Float
+  diskW: Float
+}
+
+type Flow {
+  timestamp: Time!
+  connectionId: String!
+  srcIp: String!
+  dstIp: String!
+  srcPort: Int!
+  dstPort: Int!
+  protocol: String!
+  bytes: Int!
+  packets: Int!
+  latencyMs: Float!
+}
+
+type VulnScan {
+  id: ID!
+  connectionId: ID!
+  image: String!
+  imageId: String
+  scanTime: Time!
+  criticalCount: Int!
+  highCount: Int!
+  mediumCount: Int!
+  lowCount: Int!
+  totalCount: Int!
+  vulnerabilities: [Vulnerability!]!
+}
+
+type Vulnerability {
+  id: ID!
+  vulnId: String!
+  severity: String!
+  package: String!
+  version: String!
+  fixedIn: String
+  title: String
+  description: String
+}
+
+input VulnScanInput {
+  image: String!
+  imageId: String
+  criticalCount: Int!
+  highCount: Int!
+  mediumCount: Int!
+  lowCount: Int!
+  totalCount: Int!
+  vulnerabilities: [VulnerabilityInput!]!
+}
+
+input VulnerabilityInput {
+  vulnId: String!
+  severity: String!
+  package: String!
+  version: String!
+  fixedIn: String
+  title: String
+  description: String
+}
+
+type Alert {
+  id: ID!
+  ruleId: String!
+  ruleName: String!
+  severity: String!
+  status: String!
+  labels: JSON
+  annotations: JSON
+  startsAt: Time!
+  endsAt: Time
+  firedCount: Int!
+}
+
+type AlertRule {
+  id: ID!
+  name: String!
+  description: String!
+  severity: String!
+  condition: AlertCondition!
+  channels: [String!]!
+  enabled: Boolean!
+}
+
+type AlertCondition {
+  type: String!
+  metric: String!
+  threshold: Float!
+  operator: String!
+  duration: String
+}
+
+input AlertRuleInput {
+  name: String!
+  description: String!
+  severity: String!
+  metric: String!
+  threshold: Float!
+  operator: String!
+  channels: [String!]
+  enabled: Boolean
+}
+
+type Misconfig {
+  id: String!
+  title: String!
+  description: String!
+  severity: String!
+  resource: String!
+  category: String!
+  remediation: String!
+}
+
+type K8sNamespace {
+  name: String!
+  labels: JSON
+}
+
+type K8sDeployment {
+  name: String!
+  namespace: String!
+  replicas: Int!
+  ready: Int!
+  labels: JSON
+}
+
+type K8sPod {
+  name: String!
+  namespace: String!
+  ownerName: String!
+  nodeName: String!
+  phase: String!
+  ip: String!
+  labels: JSON
+  containers: [K8sContainer!]!
+}
+
+type K8sContainer {
+  name: String!
+  image: String!
+  ready: Boolean!
+}
+
+type K8sNode {
+  name: String!
+  labels: JSON
+  addresses: [String!]!
+  capacity: JSON
+  allocatable: JSON
+}
+
+type K8sService {
+  name: String!
+  namespace: String!
+  type: String!
+  selector: JSON
+  ports: [K8sServicePort!]!
+  clusterIp: String!
+}
+
+type K8sServicePort {
+  name: String
+  port: Int!
+  targetPort: Int!
+  protocol: String!
+}
+
+type Connection {
+  id: ID!
+  orgId: ID!
+  type: String!
+  name: String!
+  status: String!
+  createdAt: Time!
+}
+
+scalar Time
+scalar JSON

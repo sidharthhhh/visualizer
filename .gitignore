@@ -1,0 +1,10 @@
+node_modules/
+bin/
+.env
+.env.*
+!.env.example
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib

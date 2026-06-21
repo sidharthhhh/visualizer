@@ -1,0 +1,197 @@
+syntax = "proto3";
+
+package containerscope.agent;
+
+option go_package = "github.com/containerscope/backend/proto/agent";
+
+service AgentService {
+  rpc Enroll(EnrollRequest) returns (EnrollResponse);
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc SyncTopology(TopologySnapshot) returns (TopologyResponse);
+  rpc StreamTopologyEvents(stream TopologyEvent) returns (TopologyResponse);
+  rpc StreamMetrics(stream MetricBatch) returns (MetricResponse);
+  rpc SyncEdges(EdgeSnapshot) returns (EdgeResponse);
+  rpc SyncK8sTopology(K8sTopologySnapshot) returns (K8sTopologyResponse);
+}
+
+message EnrollRequest {
+  string enrollment_token = 1;
+  HostInfo host_info = 2;
+}
+
+message EnrollResponse {
+  string connection_id = 1;
+  string status = 2;
+}
+
+message HostInfo {
+  string hostname = 1;
+  string os = 2;
+  string kernel = 3;
+  int32 cpu_cores = 4;
+  int64 mem_total = 5;
+  string agent_version = 6;
+}
+
+message HeartbeatRequest {
+  string connection_id = 1;
+  int64 timestamp = 2;
+}
+
+message HeartbeatResponse {
+  string status = 1;
+}
+
+message TopologySnapshot {
+  string connection_id = 1;
+  repeated ContainerInfo containers = 2;
+  repeated NetworkInfo networks = 3;
+  int64 timestamp = 4;
+}
+
+message ContainerInfo {
+  string runtime_id = 1;
+  string name = 2;
+  string image = 3;
+  string state = 4;
+  map<string, string> labels = 5;
+  repeated PortMapping ports = 6;
+  int64 created_at = 7;
+}
+
+message PortMapping {
+  string host_port = 1;
+  string container_port = 2;
+  string protocol = 3;
+}
+
+message NetworkInfo {
+  string name = 1;
+  string driver = 2;
+  string scope = 3;
+  string subnet = 4;
+}
+
+message TopologyEvent {
+  string connection_id = 1;
+  string event_type = 2;
+  ContainerInfo container = 3;
+  int64 timestamp = 4;
+}
+
+message TopologyResponse {
+  string status = 1;
+}
+
+message MetricBatch {
+  string connection_id = 1;
+  repeated MetricSample samples = 2;
+  int64 timestamp = 3;
+}
+
+message MetricSample {
+  string runtime_id = 1;
+  string metric = 2;
+  double value = 3;
+  int64 timestamp = 4;
+}
+
+message MetricResponse {
+  string status = 1;
+}
+
+message EdgeSnapshot {
+  string connection_id = 1;
+  repeated EdgeInfo edges = 2;
+  int64 timestamp = 3;
+}
+
+message EdgeInfo {
+  string src_container_id = 1;
+  string dst_container_id = 2;
+  string dst_ip = 3;
+  int32 dst_port = 4;
+  string protocol = 5;
+}
+
+message EdgeResponse {
+  string status = 1;
+}
+
+message K8sTopologySnapshot {
+  string connection_id = 1;
+  repeated K8sNamespace namespaces = 2;
+  repeated K8sDeployment deployments = 3;
+  repeated K8sReplicaSet replica_sets = 4;
+  repeated K8sPod pods = 5;
+  repeated K8sNode nodes = 6;
+  repeated K8sService services = 7;
+  int64 timestamp = 8;
+}
+
+message K8sNamespace {
+  string name = 1;
+  map<string, string> labels = 2;
+}
+
+message K8sDeployment {
+  string name = 1;
+  string namespace = 2;
+  int32 replicas = 3;
+  int32 ready = 4;
+  map<string, string> labels = 5;
+  map<string, string> selector = 6;
+}
+
+message K8sReplicaSet {
+  string name = 1;
+  string namespace = 2;
+  string owner_name = 3;
+  int32 replicas = 4;
+  int32 ready = 5;
+}
+
+message K8sPod {
+  string name = 1;
+  string namespace = 2;
+  string owner_name = 3;
+  string node_name = 4;
+  string phase = 5;
+  string ip = 6;
+  map<string, string> labels = 7;
+  repeated K8sContainer containers = 8;
+}
+
+message K8sContainer {
+  string name = 1;
+  string image = 2;
+  bool ready = 3;
+}
+
+message K8sNode {
+  string name = 1;
+  map<string, string> labels = 2;
+  repeated string addresses = 3;
+  map<string, string> capacity = 4;
+  map<string, string> allocatable = 5;
+}
+
+message K8sService {
+  string name = 1;
+  string namespace = 2;
+  string type = 3;
+  map<string, string> selector = 4;
+  repeated K8sServicePort ports = 5;
+  string cluster_ip = 6;
+}
+
+message K8sServicePort {
+  string name = 1;
+  int32 port = 2;
+  int32 target_port = 3;
+  string protocol = 4;
+}
+
+message K8sTopologyResponse {
+  string status = 1;
+}

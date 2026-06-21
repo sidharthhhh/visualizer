@@ -1,0 +1,8 @@
+bin/
+vendor/
+tmp/
+.env
+.env.*
+!.env.example
+*.md
+docs/

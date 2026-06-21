@@ -1,0 +1,158 @@
+services:
+  # ===========================================
+  # INFRASTRUCTURE
+  # ===========================================
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: containerscope-postgres
+    environment:
+      POSTGRES_USER: containerscope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SecureP@ss2024!}
+      POSTGRES_DB: containerscope
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U containerscope"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.96.0
+    container_name: containerscope-victoriametrics
+    ports:
+      - "8428:8428"
+    volumes:
+      - vm_data:/victoria-metrics-data
+    command:
+      - "--httpListenAddr=:8428"
+      - "--retentionPeriod=90d"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8428/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.1-alpine
+    container_name: containerscope-clickhouse
+    environment:
+      CLICKHOUSE_DB: containerscope
+      CLICKHOUSE_USER: containerscope
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-SecureP@ss2024!}
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+  minio:
+    image: minio/minio:latest
+    container_name: containerscope-minio
+    environment:
+      MINIO_ROOT_USER: containerscope
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-SecureP@ss2024!}
+    ports:
+      - "9100:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+  # ===========================================
+  # APPLICATION
+  # ===========================================
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: containerscope-backend
+    volumes:
+      - //var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      BACKEND_PORT: 8080
+      BACKEND_HOST: 0.0.0.0
+      LOG_LEVEL: info
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: containerscope
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-SecureP@ss2024!}
+      POSTGRES_DB: containerscope
+      POSTGRES_SSLMODE: disable
+      VICTORIAMETRICS_URL: http://victoriametrics:8428
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_PORT: 9000
+      CLICKHOUSE_USER: containerscope
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-SecureP@ss2024!}
+      CLICKHOUSE_DB: containerscope
+      JWT_SECRET: ${JWT_SECRET:-ProductionSecretKey2024!MustBe32CharsLong!}
+      JWT_ACCESS_TTL: 15m
+      JWT_REFRESH_TTL: 168h
+    ports:
+      - "8082:8080"
+      - "8083:8081"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: containerscope-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - containerscope
+
+volumes:
+  postgres_data:
+  vm_data:
+  clickhouse_data:
+  minio_data:
+
+networks:
+  containerscope:
+    driver: bridge
